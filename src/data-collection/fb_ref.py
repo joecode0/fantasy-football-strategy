@@ -1,7 +1,4 @@
 import pandas as pd
-# from proxy_requests import ProxyRequests
-# import requests
-# from bs4 import BeautifulSoup as soup
 import web-scraper as scraper
 import sys
 import time
