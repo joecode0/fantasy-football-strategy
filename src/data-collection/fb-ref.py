@@ -2,6 +2,48 @@ import pandas as pd
 # from proxy_requests import ProxyRequests
 # import requests
 # from bs4 import BeautifulSoup as soup
+import web-scraper as scraper
+
+def scrape_season_data(season_link):
+    page = scraper.get_raw_html(season_link)
+    link_list = get_all_match_links(page)
+    final_df = scrape_all_links(link_list)
+    return final_df
+
+def get_all_match_links(page):
+    link_list = []
+    main_table_body = page.find("tbody")
+    data_rows = main_table_body.findAll("tr")
+    for row in data_rows:
+        isValid = check_game_data_available(row)
+        if isValid:
+            td = row.find("td",{"data-stat":"match_report"})
+            if td.a is not None:
+                link = td.a["href"]
+                link_list.append("https://fbref.com" + link)
+    return link_list
+
+def check_game_data_available(row):
+    match_report = str(row.find("td",{"data-stat":"match_report"}).text)
+    if match_report != "Match Report":
+        return False
+    xg_a = str(row.find("td",{"data-stat":"xg_a"}).text)
+    if xg_a == "":
+        return False
+    return True
+
+def scrape_all_links(list_of_links):
+    all_dfs = []
+    print("{} links to scrape".format(len(link_list)))
+    for i in range(len(link_list)):
+        link = link_list[i]
+        page = scraper.get_raw_html(link)
+        df = get_all_match_data(page)
+        all_dfs.append(df)
+        print("{}/{} complete ({})".format(i+1,len(link_list),link.split("/")[-1]))
+    final_df = pd.concat(all_dfs,axis=0)
+    return final_df
+
 
 def get_all_match_data(page):
     match_data = get_general_match_data(page)
