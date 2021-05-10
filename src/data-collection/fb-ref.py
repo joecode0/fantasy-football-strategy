@@ -4,6 +4,7 @@ import pandas as pd
 # from bs4 import BeautifulSoup as soup
 import web-scraper as scraper
 import sys
+import time
 
 import logging
 logger = logging.getLogger(__name__)
@@ -11,12 +12,15 @@ logger = logging.getLogger(__name__)
 def scrape_and_save_every_season_data(season_links,output_folder,output_base_name):
     for season in season_links:
         link = season_links.get(season)
-        logger.info("Beginning {} season\n".format(season))
+        logger.info("Beginning {} season".format(season))
         try:
+            t1 = time.time()
             final_df = scrape_season_data(link)
             output_path = str(output_folder + "/" + season + "_" + output_base_name)
             final_df.to_csv(output_path)
+            t2 = time.time()
             logger.info("Saved {} data to {}".format(season,output_path))
+            logger.info("Took {} seconds\n".format(round(t2-t1,2)))
         except Exception as e:
             print(e.message)
             sys.exit(0)
@@ -55,7 +59,6 @@ def scrape_all_links(list_of_links):
     logger.info("{} links to scrape".format(len(link_list)))
     for i in range(len(link_list)):
         link = link_list[i]
-        logger.info("Currently reading from {}".format(link))
         page = scraper.get_raw_html(link)
         df = get_all_match_data(page)
         all_dfs.append(df)
