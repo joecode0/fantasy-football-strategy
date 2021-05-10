@@ -5,12 +5,18 @@ import pandas as pd
 import web-scraper as scraper
 import sys
 
+import logging
+logger = logging.getLogger(__name__)
+
 def scrape_and_save_every_season_data(season_links,output_folder,output_base_name):
     for season in season_links:
         link = season_links.get(season)
+        logger.info("Beginning {} season\n".format(season))
         try:
             final_df = scrape_season_data(link)
-            final_df.to_csv(output_folder + "/" + season + "_" + output_base_name)
+            output_path = str(output_folder + "/" + season + "_" + output_base_name)
+            final_df.to_csv(output_path)
+            logger.info("Saved {} data to {}".format(season,output_path))
         except Exception as e:
             print(e.message)
             sys.exit(0)
@@ -31,7 +37,8 @@ def get_all_match_links(page):
             td = row.find("td",{"data-stat":"match_report"})
             if td.a is not None:
                 link = td.a["href"]
-                link_list.append("https://fbref.com" + link)
+                full_link = "https://fbref.com" + link
+                link_list.append(full_link)
     return link_list
 
 def check_game_data_available(row):
@@ -45,13 +52,14 @@ def check_game_data_available(row):
 
 def scrape_all_links(list_of_links):
     all_dfs = []
-    print("{} links to scrape".format(len(link_list)))
+    logger.info("{} links to scrape".format(len(link_list)))
     for i in range(len(link_list)):
         link = link_list[i]
+        logger.info("Currently reading from {}".format(link))
         page = scraper.get_raw_html(link)
         df = get_all_match_data(page)
         all_dfs.append(df)
-        print("{}/{} complete ({})".format(i+1,len(link_list),link.split("/")[-1]))
+        logger.info("{}/{} complete ({})".format(i+1,len(link_list),link.split("/")[-1]))
     final_df = pd.concat(all_dfs,axis=0)
     return final_df
 
@@ -206,6 +214,8 @@ if __name__ == "__main__":
                    "09-10":"https://fbref.com/en/comps/9/400/2009-2010-Premier-League-Stats",
                    "08-09":"https://fbref.com/en/comps/9/338/2008-2009-Premier-League-Stats",
                    "07-08":"https://fbref.com/en/comps/9/282/2007-2008-Premier-League-Stats"}
+
+    logger.basicConfig(filename='example.log', encoding='utf-8', level=logging.INFO)
 
     scrape_and_save_every_season_data(all_season_links,
                                     output_folder="C:/Users/joeco/Python/fantasy-football-strategy/data/fbref",
