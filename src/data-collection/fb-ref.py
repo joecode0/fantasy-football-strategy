@@ -3,6 +3,17 @@ import pandas as pd
 # import requests
 # from bs4 import BeautifulSoup as soup
 import web-scraper as scraper
+import sys
+
+def scrape_and_save_every_season_data(season_links,output_folder,output_base_name):
+    for season in season_links:
+        link = season_links.get(season)
+        try:
+            final_df = scrape_season_data(link)
+            final_df.to_csv(output_folder + "/" + season + "_" + output_base_name)
+        except Exception as e:
+            print(e.message)
+            sys.exit(0)
 
 def scrape_season_data(season_link):
     page = scraper.get_raw_html(season_link)
@@ -179,3 +190,23 @@ def combine_team_data(datasets):
         output_list += [merged_data]
         
     return output_list
+
+if __name__ == "__main__":
+    all_season_links = {"20-21":"https://fbref.com/en/comps/9/Premier-League-Stats",
+                   "19-20":"https://fbref.com/en/comps/9/3232/2019-2020-Premier-League-Stats",
+                   "18-19":"https://fbref.com/en/comps/9/1889/2018-2019-Premier-League-Stats",
+                   "17-18":"https://fbref.com/en/comps/9/1631/2017-2018-Premier-League-Stats",
+                   "16-17":"https://fbref.com/en/comps/9/1526/2016-2017-Premier-League-Stats",
+                   "15-16":"https://fbref.com/en/comps/9/1467/2015-2016-Premier-League-Stats",
+                   "14-15":"https://fbref.com/en/comps/9/733/2014-2015-Premier-League-Stats",
+                   "13-14":"https://fbref.com/en/comps/9/669/2013-2014-Premier-League-Stats",
+                   "12-13":"https://fbref.com/en/comps/9/602/2012-2013-Premier-League-Stats",
+                   "11-12":"https://fbref.com/en/comps/9/534/2011-2012-Premier-League-Stats",
+                   "10-11":"https://fbref.com/en/comps/9/467/2010-2011-Premier-League-Stats",
+                   "09-10":"https://fbref.com/en/comps/9/400/2009-2010-Premier-League-Stats",
+                   "08-09":"https://fbref.com/en/comps/9/338/2008-2009-Premier-League-Stats",
+                   "07-08":"https://fbref.com/en/comps/9/282/2007-2008-Premier-League-Stats"}
+
+    scrape_and_save_every_season_data(all_season_links,
+                                    output_folder="C:/Users/joeco/Python/fantasy-football-strategy/data/fbref",
+                                    output_base_name="full_season_player_data.csv")
