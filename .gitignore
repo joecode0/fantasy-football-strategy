@@ -9,6 +9,9 @@ scraping-tips.txt
 # data
 /data
 /data/*
+*.csv
+*.json
+*.txt
 
 
 # hidden notebooks
