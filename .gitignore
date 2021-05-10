@@ -7,11 +7,12 @@
 scraping-tips.txt
 
 # data
-/data
-/data/*
 *.csv
 *.json
 *.txt
+
+# backups
+*.zip
 
 
 # hidden notebooks
