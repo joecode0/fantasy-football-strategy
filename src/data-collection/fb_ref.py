@@ -1,10 +1,12 @@
 import pandas as pd
-import web-scraper as scraper
+import web_scraper as scraper
 import sys
 import time
 
 import logging
+logging.basicConfig()
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 def scrape_and_save_every_season_data(season_links,output_folder,output_base_name):
     for season in season_links:
@@ -19,7 +21,7 @@ def scrape_and_save_every_season_data(season_links,output_folder,output_base_nam
             logger.info("Saved {} data to {}".format(season,output_path))
             logger.info("Took {} seconds\n".format(round(t2-t1,2)))
         except Exception as e:
-            print(e.message)
+            logger.exception(e)
             sys.exit(0)
 
 def scrape_season_data(season_link):
@@ -43,15 +45,18 @@ def get_all_match_links(page):
     return link_list
 
 def check_game_data_available(row):
-    match_report = str(row.find("td",{"data-stat":"match_report"}).text)
-    if match_report != "Match Report":
-        return False
-    xg_a = str(row.find("td",{"data-stat":"xg_a"}).text)
-    if xg_a == "":
-        return False
-    return True
+    match_report_block = row.find("td",{"data-stat":"match_report"})
+    if match_report_block is not None:
+        match_report = str(match_report_block.text)
+        if match_report != "Match Report":
+            return False
+        xg_a = str(row.find("td",{"data-stat":"xg_a"}).text)
+        if xg_a == "":
+            return False
+        return True
+    return False
 
-def scrape_all_links(list_of_links):
+def scrape_all_links(link_list):
     all_dfs = []
     logger.info("{} links to scrape".format(len(link_list)))
     for i in range(len(link_list)):
@@ -200,22 +205,20 @@ def combine_team_data(datasets):
     return output_list
 
 if __name__ == "__main__":
-    all_season_links = {"20-21":"https://fbref.com/en/comps/9/Premier-League-Stats",
-                   "19-20":"https://fbref.com/en/comps/9/3232/2019-2020-Premier-League-Stats",
-                   "18-19":"https://fbref.com/en/comps/9/1889/2018-2019-Premier-League-Stats",
-                   "17-18":"https://fbref.com/en/comps/9/1631/2017-2018-Premier-League-Stats",
-                   "16-17":"https://fbref.com/en/comps/9/1526/2016-2017-Premier-League-Stats",
-                   "15-16":"https://fbref.com/en/comps/9/1467/2015-2016-Premier-League-Stats",
-                   "14-15":"https://fbref.com/en/comps/9/733/2014-2015-Premier-League-Stats",
-                   "13-14":"https://fbref.com/en/comps/9/669/2013-2014-Premier-League-Stats",
-                   "12-13":"https://fbref.com/en/comps/9/602/2012-2013-Premier-League-Stats",
-                   "11-12":"https://fbref.com/en/comps/9/534/2011-2012-Premier-League-Stats",
-                   "10-11":"https://fbref.com/en/comps/9/467/2010-2011-Premier-League-Stats",
-                   "09-10":"https://fbref.com/en/comps/9/400/2009-2010-Premier-League-Stats",
-                   "08-09":"https://fbref.com/en/comps/9/338/2008-2009-Premier-League-Stats",
-                   "07-08":"https://fbref.com/en/comps/9/282/2007-2008-Premier-League-Stats"}
-
-    logger.basicConfig(filename='example.log', encoding='utf-8', level=logging.INFO)
+    all_season_links = {"20-21":"https://fbref.com/en/comps/9/schedule/Premier-League-Scores-and-Fixtures",
+                   "19-20":"https://fbref.com/en/comps/9/3232/schedule/2019-2020-Premier-League-Scores-and-Fixtures",
+                   "18-19":"https://fbref.com/en/comps/9/1889/schedule/2018-2019-Premier-League-Scores-and-Fixtures",
+                   "17-18":"https://fbref.com/en/comps/9/1631/schedule/2017-2018-Premier-League-Scores-and-Fixtures",
+                   "16-17":"https://fbref.com/en/comps/9/1526/schedule/2016-2017-Premier-League-Scores-and-Fixtures",
+                   "15-16":"https://fbref.com/en/comps/9/1467/schedule/2015-2016-Premier-League-Scores-and-Fixtures",
+                   "14-15":"https://fbref.com/en/comps/9/733/schedule/2014-2015-Premier-League-Scores-and-Fixtures",
+                   "13-14":"https://fbref.com/en/comps/9/669/schedule/2013-2014-Premier-League-Scores-and-Fixtures",
+                   "12-13":"https://fbref.com/en/comps/9/602/schedule/2012-2013-Premier-League-Scores-and-Fixtures",
+                   "11-12":"https://fbref.com/en/comps/9/534/schedule/2011-2012-Premier-League-Scores-and-Fixtures",
+                   "10-11":"https://fbref.com/en/comps/9/467/schedule/2010-2011-Premier-League-Scores-and-Fixtures",
+                   "09-10":"https://fbref.com/en/comps/9/400/schedule/2009-2010-Premier-League-Scores-and-Fixtures",
+                   "08-09":"https://fbref.com/en/comps/9/338/schedule/2008-2009-Premier-League-Scores-and-Fixtures",
+                   "07-08":"https://fbref.com/en/comps/9/282/schedule/2007-2008-Premier-League-Scores-and-Fixtures"}
 
     scrape_and_save_every_season_data(all_season_links,
                                     output_folder="C:/Users/joeco/Python/fantasy-football-strategy/data/fbref",
