@@ -2,6 +2,7 @@ import pandas as pd
 import web_scraper as scraper
 import sys
 import time
+import os
 
 import logging
 logging.basicConfig()
@@ -10,32 +11,37 @@ logger.setLevel(logging.INFO)
 
 def scrape_and_save_every_season_data(season_links,output_folder,output_base_name):
     for season in season_links:
-        link = season_links.get(season)
-        logger.info("Beginning {} season".format(season))
-        try:
-            t1 = time.time()
-            final_df = scrape_season_data(link)
-            output_path = str(output_folder + "/" + season + "_" + output_base_name)
-            final_df.to_csv(output_path)
-            t2 = time.time()
-            logger.info("Saved {} data to {}".format(season,output_path))
-            logger.info("Took {} seconds\n".format(round(t2-t1,2)))
-        except Exception as e:
-            logger.exception(e)
-            sys.exit(0)
+        output_path = str(output_folder + "/" + season + "_" + output_base_name)
+        if not(os.path.exists(output_path)):
+            link = season_links.get(season)
+            logger.info("Beginning {} season".format(season))
+            try:
+                t1 = time.time()
+                final_df = scrape_season_data(season,link)
+                logger.debug("Final Season CSV Data:")
+                logger.debug(final_df.iloc[0])
+                final_df.to_csv(output_path)
+                t2 = time.time()
+                logger.info("Saved {} data to {}".format(season,output_path))
+                logger.info("Took {} seconds\n".format(round(t2-t1,2)))
+            except Exception as e:
+                logger.exception(e)
+                sys.exit(0)
+        else:
+            logger.info("Season {} already exists".format(season))
 
-def scrape_season_data(season_link):
-    page = scraper.get_raw_html(season_link)
-    link_list = get_all_match_links(page)
-    final_df = scrape_all_links(link_list)
+def scrape_season_data(season,season_link,use_proxy=False):
+    page = scraper.get_raw_html(season_link,use_proxy)
+    link_list = get_all_match_links(page,season)
+    final_df = scrape_all_links(link_list,season,use_proxy)
     return final_df
 
-def get_all_match_links(page):
+def get_all_match_links(page,season):
     link_list = []
     main_table_body = page.find("tbody")
     data_rows = main_table_body.findAll("tr")
     for row in data_rows:
-        isValid = check_game_data_available(row)
+        isValid = check_game_data_available(row,season)
         if isValid:
             td = row.find("td",{"data-stat":"match_report"})
             if td.a is not None:
@@ -44,37 +50,56 @@ def get_all_match_links(page):
                 link_list.append(full_link)
     return link_list
 
-def check_game_data_available(row):
-    match_report_block = row.find("td",{"data-stat":"match_report"})
-    if match_report_block is not None:
-        match_report = str(match_report_block.text)
-        if match_report != "Match Report":
-            return False
-        xg_a = str(row.find("td",{"data-stat":"xg_a"}).text)
-        if xg_a == "":
-            return False
-        return True
-    return False
+def check_game_data_available(row,season):
+    xg_list = ["20-21","19-20","18-19","17-18"]
+    if season in xg_list:
+        match_report_block = row.find("td",{"data-stat":"match_report"})
+        if match_report_block is not None:
+            match_report = str(match_report_block.text)
+            if match_report != "Match Report":
+                return False
+            data_row = row.find("td",{"data-stat":"xg_a"})
+            if data_row == None:
+                return False
+            xg_a = str(data_row.text)
+            if xg_a == "":
+                return False
+            return True
+        return False
+    else:
+        match_report_block = row.find("td",{"data-stat":"match_report"})
+        if match_report_block is not None:
+            match_report = str(match_report_block.text)
+            if match_report != "Match Report":
+                return False
+            data_row = row.find("td",{"data-stat":"attendance"})
+            if data_row == None:
+                return False
+            attendance = str(data_row.text)
+            if attendance == "":
+                return False
+            return True
+        return False
 
-def scrape_all_links(link_list):
+def scrape_all_links(link_list,season,use_proxy=False):
     all_dfs = []
     logger.info("{} links to scrape".format(len(link_list)))
     for i in range(len(link_list)):
         link = link_list[i]
-        page = scraper.get_raw_html(link)
-        df = get_all_match_data(page)
+        logger.debug("Scraping {}".format(link))
+        page = scraper.get_raw_html(link,use_proxy)
+        df = get_all_match_data(page,season)
         all_dfs.append(df)
         logger.info("{}/{} complete ({})".format(i+1,len(link_list),link.split("/")[-1]))
     final_df = pd.concat(all_dfs,axis=0)
     return final_df
 
-
-def get_all_match_data(page):
+def get_all_match_data(page,season):
     match_data = get_general_match_data(page)
     
     relevant_data = page.findAll("div",{"id":"content"})
-    home_data,home_id = get_team_data(relevant_data,"home")
-    away_data,away_id = get_team_data(relevant_data,"away")
+    home_data,home_id = get_team_data(relevant_data,"home",season)
+    away_data,away_id = get_team_data(relevant_data,"away",season)
     
     # Each is a list of dictionaries, each dict is a row of df
     list_of_series = []
@@ -108,12 +133,18 @@ def get_general_match_data(page):
     
     d["home_name"] = str(home_data.find("a").text)
     d["home_score"] = int(home_data.find("div",{"class":"score"}).text)
-    d["home_xg"] = float(home_data.find("div",{"class":"score_xg"}).text)
+    try:
+        d["home_xg"] = float(home_data.find("div",{"class":"score_xg"}).text)
+    except Exception as e:
+        d["home_xg"] = float(0)
     d["home_manager"] = str(home_data.find("div",{"class":"datapoint"}).text.split(": ")[-1])
 
     d["away_name"] = str(away_data.find("a").text)
     d["away_score"] = int(away_data.find("div",{"class":"score"}).text)
-    d["away_xg"] = float(away_data.find("div",{"class":"score_xg"}).text)
+    try:
+        d["away_xg"] = float(away_data.find("div",{"class":"score_xg"}).text)
+    except Exception as e:
+        d["away_xg"] = float(0)
     d["away_manager"] = str(away_data.find("div",{"class":"datapoint"}).text.split(": ")[-1])
     
     d["date"] = str(generic_data.find("a").text)
@@ -122,45 +153,51 @@ def get_general_match_data(page):
     d["stadium"] = str(generic_data.findAll("small")[1].text)
     spans = generic_data.findAll("span",{"style":"display:inline-block"})
     d["ref"] = str(spans[0].text.split(" (")[0])
-    d["var_ref"] = str(spans[-1].text.split(" (")[0])
+    try:
+        d["var_ref"] = str(spans[-1].text.split(" (")[0])
+    except Exception as e:
+        d["var_ref"] = ""
     
     return d
 
-def get_team_data(team_wrapper,side):
+def get_team_data(team_wrapper,side,season):
     all_tables = team_wrapper[0].findAll("div",{"class":"table_wrapper tabbed"})
-    #print(all_tables[0])
+
     if side == "home":
         table = all_tables[0].find("div",{"class":"table_container current"})
     elif side == "away":
         table = all_tables[1].find("div",{"class":"table_container current"})
-        
+
     team_id_original = str(table["id"])
     team_id = team_id_original.split("_")[2]
     if side == "home":
         table = all_tables[0]
     elif side == "away":
         table = all_tables[1]
-    
-    
+
     summary_html = table.find("div",{"id":"div_stats_" + team_id + "_summary"}).tbody
     summary = read_table_data(summary_html)
+
+    if season in ["20-21","19-20","18-19","17-18"]:
+        passing_html = table.find("div",{"id":"div_stats_" + team_id + "_passing"}).tbody
+        passing = read_table_data(passing_html)
     
-    passing_html = table.find("div",{"id":"div_stats_" + team_id + "_passing"}).tbody
-    passing = read_table_data(passing_html)
+        passing_types_html = table.find("div",{"id":"div_stats_" + team_id + "_passing_types"}).tbody
+        passing_types = read_table_data(passing_types_html)
     
-    passing_types_html = table.find("div",{"id":"div_stats_" + team_id + "_passing_types"}).tbody
-    passing_types = read_table_data(passing_types_html)
+        defense_html = table.find("div",{"id":"div_stats_" + team_id + "_defense"}).tbody
+        defense = read_table_data(defense_html)
     
-    defense_html = table.find("div",{"id":"div_stats_" + team_id + "_defense"}).tbody
-    defense = read_table_data(defense_html)
+        possession_html = table.find("div",{"id":"div_stats_" + team_id + "_possession"}).tbody
+        possession = read_table_data(possession_html)
     
-    possession_html = table.find("div",{"id":"div_stats_" + team_id + "_possession"}).tbody
-    possession = read_table_data(possession_html)
+        misc_html = table.find("div",{"id":"div_stats_" + team_id + "_misc"}).tbody
+        misc = read_table_data(misc_html)
     
-    misc_html = table.find("div",{"id":"div_stats_" + team_id + "_misc"}).tbody
-    misc = read_table_data(misc_html)
+        output = combine_team_data([summary,passing,passing_types,defense,possession,misc])
     
-    output = combine_team_data([summary,passing,passing_types,defense,possession,misc])
+    else:
+        output = combine_team_data([summary])
     return output,team_id
     
 def read_table_data(table_html):
@@ -199,7 +236,10 @@ def combine_team_data(datasets):
     output_list = []
     for key in data_by_player.keys():
         p = data_by_player[key]
-        merged_data = {**p[0],**p[1],**p[2],**p[3],**p[4],**p[5]}
+        if len(datasets) == 1:
+            merged_data = {**p[0]}
+        else:
+            merged_data = {**p[0],**p[1],**p[2],**p[3],**p[4],**p[5]}
         output_list += [merged_data]
         
     return output_list
